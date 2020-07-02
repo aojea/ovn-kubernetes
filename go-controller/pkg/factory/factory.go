@@ -11,12 +11,14 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/metrics"
 
 	kapi "k8s.io/api/core/v1"
+	kdiscovery "k8s.io/api/discovery/v1beta1"
 	knet "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	informerfactory "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
+	discoverylisters "k8s.io/client-go/listers/discovery/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -294,6 +296,8 @@ func newInformerLister(oType reflect.Type, sharedInformer cache.SharedIndexInfor
 		return listers.NewServiceLister(sharedInformer.GetIndexer()), nil
 	case endpointsType:
 		return listers.NewEndpointsLister(sharedInformer.GetIndexer()), nil
+	case endpointSliceType:
+		return discoverylisters.NewEndpointSliceLister(sharedInformer.GetIndexer()), nil
 	case namespaceType:
 		return listers.NewNamespaceLister(sharedInformer.GetIndexer()), nil
 	case nodeType:
@@ -407,6 +411,8 @@ type ObjectCacheInterface interface {
 	GetService(namespace, name string) (*kapi.Service, error)
 	GetEndpoints(namespace string) ([]*kapi.Endpoints, error)
 	GetEndpoint(namespace, name string) (*kapi.Endpoints, error)
+	GetEndpointSlices(namespace string) ([]*kdiscovery.EndpointSlice, error)
+	GetEndpointSlice(namespace, name string) (*kdiscovery.EndpointSlice, error)
 	GetNamespace(name string) (*kapi.Namespace, error)
 	GetNamespaces() ([]*kapi.Namespace, error)
 }
@@ -423,12 +429,13 @@ const (
 )
 
 var (
-	podType       reflect.Type = reflect.TypeOf(&kapi.Pod{})
-	serviceType   reflect.Type = reflect.TypeOf(&kapi.Service{})
-	endpointsType reflect.Type = reflect.TypeOf(&kapi.Endpoints{})
-	policyType    reflect.Type = reflect.TypeOf(&knet.NetworkPolicy{})
-	namespaceType reflect.Type = reflect.TypeOf(&kapi.Namespace{})
-	nodeType      reflect.Type = reflect.TypeOf(&kapi.Node{})
+	podType           reflect.Type = reflect.TypeOf(&kapi.Pod{})
+	serviceType       reflect.Type = reflect.TypeOf(&kapi.Service{})
+	endpointsType     reflect.Type = reflect.TypeOf(&kapi.Endpoints{})
+	endpointSliceType reflect.Type = reflect.TypeOf(&kdiscovery.EndpointSlice{})
+	policyType        reflect.Type = reflect.TypeOf(&knet.NetworkPolicy{})
+	namespaceType     reflect.Type = reflect.TypeOf(&kapi.Namespace{})
+	nodeType          reflect.Type = reflect.TypeOf(&kapi.Node{})
 )
 
 // NewWatchFactory initializes a new watch factory
@@ -454,6 +461,10 @@ func NewWatchFactory(c kubernetes.Interface) (*WatchFactory, error) {
 		return nil, err
 	}
 	wf.informers[endpointsType], err = newInformer(endpointsType, wf.iFactory.Core().V1().Endpoints().Informer())
+	if err != nil {
+		return nil, err
+	}
+	wf.informers[endpointSliceType], err = newInformer(endpointSliceType, wf.iFactory.Discovery().V1beta1().EndpointSlices().Informer())
 	if err != nil {
 		return nil, err
 	}
@@ -501,6 +512,10 @@ func getObjectMeta(objType reflect.Type, obj interface{}) (*metav1.ObjectMeta, e
 		}
 	case endpointsType:
 		if endpoints, ok := obj.(*kapi.Endpoints); ok {
+			return &endpoints.ObjectMeta, nil
+		}
+	case endpointSliceType:
+		if endpoints, ok := obj.(*kdiscovery.EndpointSlice); ok {
 			return &endpoints.ObjectMeta, nil
 		}
 	case policyType:
@@ -617,6 +632,21 @@ func (wf *WatchFactory) RemoveEndpointsHandler(handler *Handler) error {
 	return wf.removeHandler(endpointsType, handler)
 }
 
+// AddEndpointSliceHandler adds a handler function that will be executed on EndpointSlice object changes
+func (wf *WatchFactory) AddEndpointSliceHandler(handlerFuncs cache.ResourceEventHandler, processExisting func([]interface{})) (*Handler, error) {
+	return wf.addHandler(endpointSliceType, "", nil, handlerFuncs, processExisting)
+}
+
+// AddFilteredEndpointSliceHandler adds a handler function that will be executed when EndpointSlice objects that match the given filters change
+func (wf *WatchFactory) AddFilteredEndpointSliceHandler(namespace string, lsel *metav1.LabelSelector, handlerFuncs cache.ResourceEventHandler, processExisting func([]interface{})) (*Handler, error) {
+	return wf.addHandler(endpointSliceType, namespace, lsel, handlerFuncs, processExisting)
+}
+
+// RemoveEndpointSliceHandler removes a EndpointSlice object event handler function
+func (wf *WatchFactory) RemoveEndpointSliceHandler(handler *Handler) error {
+	return wf.removeHandler(endpointSliceType, handler)
+}
+
 // AddPolicyHandler adds a handler function that will be executed on NetworkPolicy object changes
 func (wf *WatchFactory) AddPolicyHandler(handlerFuncs cache.ResourceEventHandler, processExisting func([]interface{})) (*Handler, error) {
 	return wf.addHandler(policyType, "", nil, handlerFuncs, processExisting)
@@ -692,6 +722,18 @@ func (wf *WatchFactory) GetEndpoints(namespace string) ([]*kapi.Endpoints, error
 func (wf *WatchFactory) GetEndpoint(namespace, name string) (*kapi.Endpoints, error) {
 	endpointsLister := wf.informers[endpointsType].lister.(listers.EndpointsLister)
 	return endpointsLister.Endpoints(namespace).Get(name)
+}
+
+// GetEndpointSlices returns the endpoints slice list in a given namespace
+func (wf *WatchFactory) GetEndpointSlices(namespace string) ([]*kdiscovery.EndpointSlice, error) {
+	endpointSliceLister := wf.informers[endpointSliceType].lister.(discoverylisters.EndpointSliceLister)
+	return endpointSliceLister.EndpointSlices(namespace).List(labels.Everything())
+}
+
+// GetEndpointSlice returns a specific endpoint slice in a given namespace
+func (wf *WatchFactory) GetEndpointSlice(namespace, name string) (*kdiscovery.EndpointSlice, error) {
+	endpointSliceLister := wf.informers[endpointSliceType].lister.(discoverylisters.EndpointSliceLister)
+	return endpointSliceLister.EndpointSlices(namespace).Get(name)
 }
 
 // GetNamespace returns a specific namespace

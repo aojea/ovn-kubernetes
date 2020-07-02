@@ -7,7 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	kdiscovery "k8s.io/api/discovery/v1beta1"
 	knet "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,6 +86,12 @@ func newEndpoints(name, namespace string) *v1.Endpoints {
 	}
 }
 
+func newEndpointSlice(name, namespace string) *kdiscovery.EndpointSlice {
+	return &kdiscovery.EndpointSlice{
+		ObjectMeta: newObjectMeta(name, namespace),
+	}
+}
+
 func newService(name, namespace string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,17 +132,19 @@ func (c *handlerCalls) getDeleted() int {
 
 var _ = Describe("Watch Factory Operations", func() {
 	var (
-		fakeClient                                *fake.Clientset
-		podWatch, namespaceWatch, nodeWatch       *watch.FakeWatcher
-		policyWatch, endpointsWatch, serviceWatch *watch.FakeWatcher
-		pods                                      []*v1.Pod
-		namespaces                                []*v1.Namespace
-		nodes                                     []*v1.Node
-		policies                                  []*knet.NetworkPolicy
-		endpoints                                 []*v1.Endpoints
-		services                                  []*v1.Service
-		wf                                        *WatchFactory
-		err                                       error
+		fakeClient                          *fake.Clientset
+		podWatch, namespaceWatch, nodeWatch *watch.FakeWatcher
+		policyWatch, serviceWatch           *watch.FakeWatcher
+		endpointsWatch, endpointslicesWatch *watch.FakeWatcher
+		pods                                []*v1.Pod
+		namespaces                          []*v1.Namespace
+		nodes                               []*v1.Node
+		policies                            []*knet.NetworkPolicy
+		endpoints                           []*v1.Endpoints
+		endpointslices                      []*kdiscovery.EndpointSlice
+		services                            []*v1.Service
+		wf                                  *WatchFactory
+		err                                 error
 	)
 
 	BeforeEach(func() {
@@ -181,6 +190,15 @@ var _ = Describe("Watch Factory Operations", func() {
 		endpointsWatch = objSetup(fakeClient, "endpoints", func(core.Action) (bool, runtime.Object, error) {
 			obj := &v1.EndpointsList{}
 			for _, p := range endpoints {
+				obj.Items = append(obj.Items, *p)
+			}
+			return true, obj, nil
+		})
+
+		endpointslices = make([]*kdiscovery.EndpointSlice, 0)
+		endpointslicesWatch = objSetup(fakeClient, "endpointslices", func(core.Action) (bool, runtime.Object, error) {
+			obj := &kdiscovery.EndpointSliceList{}
+			for _, p := range endpointslices {
 				obj.Items = append(obj.Items, *p)
 			}
 			return true, obj, nil
@@ -238,6 +256,11 @@ var _ = Describe("Watch Factory Operations", func() {
 		It("is called for each existing endpoints", func() {
 			endpoints = append(endpoints, newEndpoints("myendpoint", "default"))
 			testExisting(endpointsType, "", nil)
+		})
+
+		It("is called for each existing endpoint slice", func() {
+			endpointslices = append(endpointslices, newEndpointSlice("myendpointslice", "default"))
+			testExisting(endpointSliceType, "", nil)
 		})
 
 		It("is called for each existing service", func() {
@@ -301,6 +324,12 @@ var _ = Describe("Watch Factory Operations", func() {
 			endpoints = append(endpoints, newEndpoints("myendpoint", "default"))
 			endpoints = append(endpoints, newEndpoints("myendpoint2", "default"))
 			testExisting(endpointsType)
+		})
+
+		It("calls ADD for each existing endpoints slice", func() {
+			endpointslices = append(endpointslices, newEndpointSlice("myendpointslice", "default"))
+			endpointslices = append(endpointslices, newEndpointSlice("myendpointslice2", "default"))
+			testExisting(endpointSliceType)
 		})
 
 		It("calls ADD for each existing service", func() {
@@ -798,6 +827,45 @@ var _ = Describe("Watch Factory Operations", func() {
 		Eventually(c.getDeleted, 2).Should(Equal(1))
 
 		wf.RemoveEndpointsHandler(h)
+	})
+
+	It("responds to endpoint slices add/update/delete events", func() {
+		wf, err = NewWatchFactory(fakeClient)
+		Expect(err).NotTo(HaveOccurred())
+
+		added := newEndpointSlice("myendpointslice", "default")
+		h, c := addHandler(wf, endpointSliceType, cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				eps := obj.(*kdiscovery.EndpointSlice)
+				Expect(reflect.DeepEqual(eps, added)).To(BeTrue())
+			},
+			UpdateFunc: func(old, new interface{}) {
+				newEPs := new.(*kdiscovery.EndpointSlice)
+				Expect(reflect.DeepEqual(newEPs, added)).To(BeTrue())
+				Expect(len(newEPs.Ports)).To(Equal(1))
+			},
+			DeleteFunc: func(obj interface{}) {
+				eps := obj.(*kdiscovery.EndpointSlice)
+				Expect(reflect.DeepEqual(eps, added)).To(BeTrue())
+			},
+		})
+
+		endpointslices = append(endpointslices, added)
+		endpointslicesWatch.Add(added)
+		Eventually(c.getAdded, 2).Should(Equal(1))
+		name := "foobar"
+		port := int32(1234)
+		added.Ports = append(added.Ports, kdiscovery.EndpointPort{
+			Name: &name,
+			Port: &port,
+		})
+		endpointslicesWatch.Modify(added)
+		Eventually(c.getUpdated, 2).Should(Equal(1))
+		endpointslices = endpointslices[:0]
+		endpointslicesWatch.Delete(added)
+		Eventually(c.getDeleted, 2).Should(Equal(1))
+
+		wf.RemoveEndpointSliceHandler(h)
 	})
 
 	It("responds to service add/update/delete events", func() {
