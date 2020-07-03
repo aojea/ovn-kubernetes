@@ -113,6 +113,9 @@ var (
 	// EnableMulticast enables multicast support between the pods within the same namespace
 	EnableMulticast bool
 
+	// EnableEndpointSlices uses the Kubernetes EndpointSlice API instead of the Endpoint API for tracking network endpoints
+	EnableEndpointSlices bool
+
 	// IPv4Mode captures whether we are using IPv4 for OVN logical topology. (ie, single-stack IPv4 or dual-stack)
 	IPv4Mode bool
 
@@ -511,6 +514,11 @@ var CommonFlags = []cli.Flag{
 		Name:        "enable-multicast",
 		Usage:       "Adds multicast support. Valid only with --init-master option.",
 		Destination: &EnableMulticast,
+	},
+	&cli.BoolFlag{
+		Name:        "enable-endpoint-slices",
+		Usage:       "Use the Kubernetes EndpointSlice API instead of the Endpoint API for tracking network endpoints.",
+		Destination: &EnableEndpointSlices,
 	},
 	// Logging options
 	&cli.IntFlag{

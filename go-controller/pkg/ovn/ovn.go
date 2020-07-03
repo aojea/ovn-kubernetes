@@ -127,6 +127,9 @@ type Controller struct {
 	// Supports multicast?
 	multicastSupport bool
 
+	// Use EndpointSlice API instaed of Endpoints API
+	endpointSlice bool
+
 	// Map of load balancers to service namespace
 	serviceVIPToName map[ServiceVIPKey]types.NamespacedName
 
@@ -176,6 +179,7 @@ func NewOvnController(kubeClient kubernetes.Interface, wf *factory.WatchFactory,
 		lspMutex:                 &sync.Mutex{},
 		loadbalancerClusterCache: make(map[kapi.Protocol]string),
 		multicastSupport:         config.EnableMulticast,
+		endpointSlice:            config.EnableEndpointSlices,
 		serviceVIPToName:         make(map[ServiceVIPKey]types.NamespacedName),
 		serviceVIPToNameLock:     sync.Mutex{},
 		serviceLBMap:             make(map[string]map[string]*loadBalancerConf),
