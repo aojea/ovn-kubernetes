@@ -47,20 +47,30 @@ should prevent Ingress creation if more than 1 IngressClass marked as default
 
 SKIPPED_TESTS=$(echo "${SKIPPED_TESTS}" | sed -e '/^\($\|#\)/d' -e 's/ /\\s/g' | tr '\n' '|' | sed -e 's/|$//')
 
-GINKGO_ARGS="--num-nodes=2 --ginkgo.skip=${SKIPPED_TESTS} --disable-log-dump=false --report-dir=${E2E_REPORT_DIR} --report-prefix=${E2E_REPORT_PREFIX}"
+GINKGO_ARGS="--num-nodes=2 --disable-log-dump=false --report-dir=${E2E_REPORT_DIR} --report-prefix=${E2E_REPORT_PREFIX}"
+
+# if we set PARALLEL=true, skip serial tests set --ginkgo-parallel
+if [ "${PARALLEL:-true}" = "true" ]; then
+  GINKGO_ARGS+=("--nodes=25")
+  SKIPPED_TESTS="${SKIPPED_TESTS}|\\[Serial\\]"
+fi
 
 case "$SHARD" in
-	shard-n-other)
+	shard-network)
 		# all tests that don't have P as their sixth letter after the N, and all other tests
-		GINKGO_ARGS="${GINKGO_ARGS} "'--ginkgo.focus=\[sig-network\]\s([Nn](.{6}[^Pp].*|.{0,6}$)|[^Nn].*)'
+		GINKGO_ARGS="${GINKGO_ARGS} --ginkgo.focus=\\[sig-network\\] --ginkgo.skip=${SKIPPED_TESTS}"
 		;;
-	shard-np)
-		# all tests that have P as the sixth letter after the N
-		GINKGO_ARGS="${GINKGO_ARGS} "'--ginkgo.focus=\[sig-network\]\s[Nn].{6}[Pp].*$'
+	shard-conformance)
+		# all conformance but serial
+		GINKGO_ARGS="${GINKGO_ARGS} --ginkgo.focus=\\[Conformance\\] --ginkgo.skip=${SKIPPED_TESTS}"
+		;;
+	shard-conformance)
+		# all conformance
+		GINKGO_ARGS="${GINKGO_ARGS} --ginkgo.focus=\\[Conformance\\] --ginkgo.skip=${SKIPPED_TESTS}"
 		;;
 	shard-test)
 		TEST_REGEX_REPR=$(echo ${@:2} | sed 's/ /\\s/g')
-		GINKGO_ARGS="${GINKGO_ARGS} "'--ginkgo.focus=\[sig-network\].*'$TEST_REGEX_REPR'.*'
+		GINKGO_ARGS="${GINKGO_ARGS} --ginkgo.focus=$TEST_REGEX_REPR --ginkgo.skip=${SKIPPED_TESTS}"
 		;;
 	*)
 		echo "unknown shard"
