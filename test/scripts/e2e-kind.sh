@@ -50,6 +50,7 @@ SKIPPED_TESTS=$(echo "${SKIPPED_TESTS}" | sed -e '/^\($\|#\)/d' -e 's/ /\\s/g' |
 # if we set PARALLEL=true, skip serial test
 if [ "${PARALLEL:-true}" = "true" ]; then
   export GINKGO_PARALLEL=y
+  export GINKGO_PARALLEL_NODES=10
   SKIPPED_TESTS="${SKIPPED_TESTS}|\\[Serial\\]"
 fi
 
