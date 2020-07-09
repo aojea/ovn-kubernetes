@@ -17,6 +17,14 @@ function testrun {
     local args=
     local ginkgoargs=
     local path=${pkg#github.com/ovn-org/ovn-kubernetes/go-controller}
+    # enable go race detector
+    if [ ! -z "${RACE:-}" ]; then
+    # FIXME hybrid-overlay tests are racy
+        if [[ "${pkg}" != github.com/ovn-org/ovn-kubernetes/go-controller/hybrid-overlay/pkg/controller ]]; then
+            args="-race "
+        fi
+    fi
+    # coverage is incompatible with the race detector
     if [ ! -z "${COVERALLS:-}" ]; then
         args="-covermode set -coverprofile ${idx}.coverprofile "
     fi
@@ -26,7 +34,7 @@ function testrun {
     fi
     args="${args}${otherargs}${pkg}"
 
-    go test -mod vendor ${args} ${ginkgoargs}
+    go test ${args} ${ginkgoargs} -mod vendor
 }
 
 # These packages requires root for network namespace maniuplation in unit tests
