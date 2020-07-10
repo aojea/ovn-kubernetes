@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/urfave/cli/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -557,10 +555,6 @@ var _ = Describe("Hybrid Overlay Node Linux Operations", func() {
 			f.Start(stopChan)
 			go n.Run(stopChan)
 
-			// Wait for the controller to start
-			err = wait.PollImmediate(500*time.Millisecond, 5*time.Second, func() (bool, error) { return n.ready == true, nil })
-			Expect(err).NotTo(HaveOccurred())
-
 			// FIXME
 			// Eventually(fexec.CalledMatchesExpected, 2).Should(BeTrue(), fexec.ErrorDesc)
 			return nil
@@ -629,10 +623,6 @@ var _ = Describe("Hybrid Overlay Node Linux Operations", func() {
 
 			f.Start(stopChan)
 			go n.Run(stopChan)
-
-			// Wait for the controller to start
-			err = wait.PollImmediate(500*time.Millisecond, 5*time.Second, func() (bool, error) { return n.ready == true, nil })
-			Expect(err).NotTo(HaveOccurred())
 
 			// FIXME
 			// Eventually(fexec.CalledMatchesExpected, 2).Should(BeTrue(), fexec.ErrorDesc)

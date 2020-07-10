@@ -31,7 +31,6 @@ type nodeController interface {
 
 // Node is a node controller and it's informers
 type Node struct {
-	ready            bool
 	controller       nodeController
 	nodeEventHandler informer.EventHandler
 	podEventHandler  informer.EventHandler
@@ -150,7 +149,6 @@ func (n *Node) Run(stopCh <-chan struct{}) error {
 	go n.controller.RunFlowSync(stopCh)
 
 	klog.Info("Started workers")
-	n.ready = true
 	<-stopCh
 	klog.Info("Shutting down workers")
 	return nil

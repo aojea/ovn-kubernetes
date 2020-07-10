@@ -38,8 +38,12 @@ type flowCacheEntry struct {
 
 // NodeController is the node hybrid overlay controller
 type NodeController struct {
-	kube        kube.Interface
-	nodeName    string
+	kube     kube.Interface
+	nodeName string
+	// FIXME: there can be a race using initialized
+	// it's being used in EnsureHybridOverlayBridge() and in AddPod()
+	// but, AddPod() and AddNode() calls EnsureHybridOverlayBridge()
+	mu          sync.Mutex
 	initialized bool
 	drMAC       net.HardwareAddr
 	drIP        net.IP
@@ -117,7 +121,11 @@ func (n *NodeController) AddPod(pod *kapi.Pod) error {
 	// if the IP/MAC or Annotations have changed
 	ignoreLearn := true
 
+	// FIXME return an error if bridge does not exist and handle it in the reconcile loop
+	// and remove this ugly locking
+	n.mu.Lock()
 	if !n.initialized {
+		n.mu.Unlock()
 		node, err := n.nodeLister.Get(n.nodeName)
 		if err != nil {
 			return fmt.Errorf("hybrid overlay not initialized on %s, and failed to get node data: %v",
@@ -126,7 +134,10 @@ func (n *NodeController) AddPod(pod *kapi.Pod) error {
 		if err = n.EnsureHybridOverlayBridge(node); err != nil {
 			return fmt.Errorf("failed to ensure hybrid overlay in pod handler: %v", err)
 		}
+	} else {
+		n.mu.Unlock()
 	}
+
 	if n.drMAC == nil || n.drIP == nil {
 		return fmt.Errorf("empty values for DR MAC: %s or DR IP: %s on node %s", n.drMAC, n.drIP, n.nodeName)
 	}
@@ -387,6 +398,8 @@ func getIPAsHexString(ip net.IP) string {
 
 // EnsureHybridOverlayBridge sets up the hybrid overlay bridge
 func (n *NodeController) EnsureHybridOverlayBridge(node *kapi.Node) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.initialized {
 		return nil
 	}
