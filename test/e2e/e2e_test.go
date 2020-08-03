@@ -672,11 +672,10 @@ var _ = Describe("e2e external gateway validation", func() {
 		}
 		// strip the apostrophe from stdout and parse the pod cidr
 		annotation := strings.Replace(kubectlOut, "'", "", -1)
-		defaultSubnet := make(map[string]string)
-		if err := json.Unmarshal([]byte(annotation), &defaultSubnet); err != nil {
+		podCIDR, err := parseSubnetAnnotation(annotation)
+		if err != nil {
 			framework.Failf("Error parsing the pod cidr from %s %v", ciWorkerNodeSrc, err)
 		}
-		podCIDR := defaultSubnet["default"]
 		framework.Logf("the pod cidr for node %s is %s", ciWorkerNodeSrc, podCIDR)
 		// setup the container to act as an external gateway and vtep
 		_, err = runCommand("docker", "exec", gwContainerName, "ip", "link", "add", "vxlan0", "type", "vxlan", "dev",
@@ -836,11 +835,10 @@ var _ = Describe("e2e multiple external gateway update validation", func() {
 		}
 		// strip the apostrophe from stdout and parse the pod cidr
 		annotation := strings.Replace(kubectlOut, "'", "", -1)
-		defaultSubnet := make(map[string]string)
-		if err := json.Unmarshal([]byte(annotation), &defaultSubnet); err != nil {
+		podCIDR, err := parseSubnetAnnotation(annotation)
+		if err != nil {
 			framework.Failf("Error parsing the pod cidr from %s %v", ciWorkerNodeSrc, err)
 		}
-		podCIDR := defaultSubnet["default"]
 		framework.Logf("the pod cidr for node %s is %s", ciWorkerNodeSrc, podCIDR)
 		// setup the new container to emulate a gateway with routes, vtep and a loopback interface acting as the gateway
 		_, err = runCommand("docker", "exec", gwContainerNameAlt1, "ip", "link", "add", "vxlan0", "type", "vxlan", "dev",
@@ -967,3 +965,25 @@ var _ = Describe("e2e multiple external gateway update validation", func() {
 		}
 	})
 })
+
+func parseSubnetAnnotation(annotation string) (string, error) {
+	var subnets []string
+	var ok bool
+	subnetsDual := make(map[string][]string)
+	if err := json.Unmarshal([]byte(annotation), &subnetsDual); err == nil {
+		subnets, ok = subnetsDual["default"]
+	} else {
+		subnetsSingle := make(map[string]string)
+		if err := json.Unmarshal([]byte(annotation), &subnetsSingle); err != nil {
+			return "", fmt.Errorf("could not parse annotation %q as either single-stack or dual-stack",
+				annotation)
+		}
+
+		subnets[0], ok = subnetsSingle["default"]
+	}
+	if !ok {
+		return "", fmt.Errorf("annotation %q has no default network", annotation)
+	}
+
+	return subnets[0], nil
+}
