@@ -352,7 +352,7 @@ func (pr *PodRequest) ConfigureInterface(namespace string, podName string, ifInf
 	}
 
 	if err = waitForPodFlows(ifInfo.MAC.String()); err != nil {
-		return nil, fmt.Errorf("timed out waiting for pod flows for pod: %s, error: %v", podName, err)
+		return nil, fmt.Errorf("timed out waiting for pod flows for pod: %s, with MAC: %s, error: %v", podName, ifInfo.MAC.String(), err)
 	}
 
 	return []*current.Interface{hostIface, contIface}, nil
@@ -389,7 +389,7 @@ func (pr *PodRequest) deletePodConntrack() {
 func (pr *PodRequest) PlatformSpecificCleanup() error {
 	ifaceName := pr.SandboxID[:15]
 	ovsArgs := []string{
-		"del-port", "br-int", ifaceName,
+		"--if-exists", "--with-iface", "del-port", "br-int", ifaceName,
 	}
 	out, err := exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()
 	if err != nil && !strings.Contains(string(out), "no port named") {
