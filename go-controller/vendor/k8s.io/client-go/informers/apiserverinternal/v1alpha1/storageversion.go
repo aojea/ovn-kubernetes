@@ -22,69 +22,68 @@ import (
 	"context"
 	time "time"
 
-	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/settings/v1alpha1"
+	v1alpha1 "k8s.io/client-go/listers/apiserverinternal/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// PodPresetInformer provides access to a shared informer and lister for
-// PodPresets.
-type PodPresetInformer interface {
+// StorageVersionInformer provides access to a shared informer and lister for
+// StorageVersions.
+type StorageVersionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.PodPresetLister
+	Lister() v1alpha1.StorageVersionLister
 }
 
-type podPresetInformer struct {
+type storageVersionInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
-// NewPodPresetInformer constructs a new informer for PodPreset type.
+// NewStorageVersionInformer constructs a new informer for StorageVersion type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodPresetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodPresetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredStorageVersionInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodPresetInformer constructs a new informer for PodPreset type.
+// NewFilteredStorageVersionInformer constructs a new informer for StorageVersion type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodPresetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SettingsV1alpha1().PodPresets(namespace).List(context.TODO(), options)
+				return client.InternalV1alpha1().StorageVersions().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SettingsV1alpha1().PodPresets(namespace).Watch(context.TODO(), options)
+				return client.InternalV1alpha1().StorageVersions().Watch(context.TODO(), options)
 			},
 		},
-		&settingsv1alpha1.PodPreset{},
+		&apiserverinternalv1alpha1.StorageVersion{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *podPresetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodPresetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *storageVersionInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredStorageVersionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podPresetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&settingsv1alpha1.PodPreset{}, f.defaultInformer)
+func (f *storageVersionInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apiserverinternalv1alpha1.StorageVersion{}, f.defaultInformer)
 }
 
-func (f *podPresetInformer) Lister() v1alpha1.PodPresetLister {
-	return v1alpha1.NewPodPresetLister(f.Informer().GetIndexer())
+func (f *storageVersionInformer) Lister() v1alpha1.StorageVersionLister {
+	return v1alpha1.NewStorageVersionLister(f.Informer().GetIndexer())
 }

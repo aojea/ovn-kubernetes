@@ -19,27 +19,27 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/settings/v1alpha1"
+	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
-type SettingsV1alpha1Interface interface {
+type InternalV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	PodPresetsGetter
+	StorageVersionsGetter
 }
 
-// SettingsV1alpha1Client is used to interact with features provided by the settings.k8s.io group.
-type SettingsV1alpha1Client struct {
+// InternalV1alpha1Client is used to interact with features provided by the internal.apiserver.k8s.io group.
+type InternalV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *SettingsV1alpha1Client) PodPresets(namespace string) PodPresetInterface {
-	return newPodPresets(c, namespace)
+func (c *InternalV1alpha1Client) StorageVersions() StorageVersionInterface {
+	return newStorageVersions(c)
 }
 
-// NewForConfig creates a new SettingsV1alpha1Client for the given config.
-func NewForConfig(c *rest.Config) (*SettingsV1alpha1Client, error) {
+// NewForConfig creates a new InternalV1alpha1Client for the given config.
+func NewForConfig(c *rest.Config) (*InternalV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -48,12 +48,12 @@ func NewForConfig(c *rest.Config) (*SettingsV1alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SettingsV1alpha1Client{client}, nil
+	return &InternalV1alpha1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new SettingsV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new InternalV1alpha1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *SettingsV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *InternalV1alpha1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -61,9 +61,9 @@ func NewForConfigOrDie(c *rest.Config) *SettingsV1alpha1Client {
 	return client
 }
 
-// New creates a new SettingsV1alpha1Client for the given RESTClient.
-func New(c rest.Interface) *SettingsV1alpha1Client {
-	return &SettingsV1alpha1Client{c}
+// New creates a new InternalV1alpha1Client for the given RESTClient.
+func New(c rest.Interface) *InternalV1alpha1Client {
+	return &InternalV1alpha1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
@@ -81,7 +81,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *SettingsV1alpha1Client) RESTClient() rest.Interface {
+func (c *InternalV1alpha1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

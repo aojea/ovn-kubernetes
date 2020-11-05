@@ -31,10 +31,10 @@ require (
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	k8s.io/api v0.19.3
-	k8s.io/apiextensions-apiserver v0.19.3
-	k8s.io/apimachinery v0.19.3
-	k8s.io/client-go v0.19.3
+	k8s.io/api v0.20.0-beta.1
+	k8s.io/apiextensions-apiserver v0.20.0-beta.1
+	k8s.io/apimachinery v0.20.0-beta.1
+	k8s.io/client-go v0.20.0-beta.1
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.4.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20201104192653-842b07581b16 // indirect
@@ -43,8 +43,8 @@ require (
 
 replace (
 	github.com/ebay/go-ovn v0.1.0 => github.com/ebay/go-ovn v0.1.1-0.20200810162212-30abed5fb968
-	k8s.io/api => k8s.io/api v0.19.3
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.19.3
-	k8s.io/client-go => k8s.io/client-go v0.19.3
+	k8s.io/api => k8s.io/api v0.20.0-beta.1
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.0-beta.1
+	k8s.io/apimachinery => k8s.io/apimachinery v0.20.0-beta.1
+	k8s.io/client-go => k8s.io/client-go v0.20.0-beta.1
 )
