@@ -281,7 +281,7 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 
 	oc.WatchPods()
 
-	// Services are handled different depending on the Kubernetes API versions
+	// Services are handled differently depending on the Kubernetes API versions
 	// We use a level triggered if k8s > 1.20, using endpoint slices instead endpoints
 	if util.DetectEndpointSlices(oc.kube) {
 		klog.Infof("watching EndpointSlices instead of Endpoint in k8s versions > 1.19")
@@ -313,6 +313,7 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 			defer wg.Done()
 			servicesv2.NewController(
 				oc.kube,
+				oc.ovnNBClient,
 				informerFactory.Core().V1().Services(),
 				informerFactory.Discovery().V1beta1().EndpointSlices(),
 			).Run(numWorkers, oc.StopChan)
