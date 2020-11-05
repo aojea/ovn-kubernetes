@@ -8,7 +8,7 @@ require (
 	github.com/bhendo/go-powershell v0.0.0-20190719160123-219e7fb4e41e
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/containernetworking/cni v0.8.0
-	github.com/containernetworking/plugins v0.8.6
+	github.com/containernetworking/plugins v0.8.7
 	github.com/coreos/go-iptables v0.4.5
 	github.com/ebay/go-ovn v0.1.0
 	github.com/ebay/libovsdb v0.2.1-0.20200719163122-3332afaeb27c
