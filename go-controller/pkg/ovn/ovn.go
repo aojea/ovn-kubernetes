@@ -16,6 +16,7 @@ import (
 	egressipv1 "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/egressip/v1"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/factory"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/kube"
+	servicesv2 "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/ovn/controller/services"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/ovn/ipallocator"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/ovn/subnetallocator"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"
@@ -29,7 +30,9 @@ import (
 	kapisnetworking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -277,8 +280,51 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 	oc.WatchNodes()
 
 	oc.WatchPods()
-	oc.WatchServices()
-	oc.WatchEndpoints()
+
+	// Services are handled different depending on the Kubernetes API versions
+	// We use a level triggered if k8s > 1.20, using endpoint slices instead endpoints
+	if util.DetectEndpointSlices(oc.kube) {
+		klog.Infof("watching EndpointSlices instead of Endpoint in k8s versions > 1.19")
+		// Create our own informers to start compartamentalizing the code
+		// filter server side the things we don't care about
+		noProxyName, err := labels.NewRequirement("service.kubernetes.io/service-proxy-name", selection.DoesNotExist, nil)
+		if err != nil {
+			return err
+		}
+
+		noHeadlessEndpoints, err := labels.NewRequirement(kapi.IsHeadlessService, selection.DoesNotExist, nil)
+		if err != nil {
+			return err
+		}
+
+		labelSelector := labels.NewSelector()
+		labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+
+		// Make informers that filter out objects that want a non-default service proxy.
+		informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.LabelSelector = labelSelector.String()
+			}))
+
+		wg.Add(1)
+		go func() {
+			// TODO: Parametrize correctly
+			const numWorkers = 2
+			defer wg.Done()
+			servicesv2.NewController(
+				oc.kube,
+				informerFactory.Core().V1().Services(),
+				informerFactory.Discovery().V1beta1().EndpointSlices(),
+			).Run(numWorkers, oc.StopChan)
+		}()
+
+	} else {
+		// edge triggered k8s < 1.20
+		klog.Infof("watching Endpoints instead of EndpointSlices in k8s versions < 1.20")
+		oc.WatchServices()
+		oc.WatchEndpoints()
+	}
+
 	oc.WatchNetworkPolicy()
 	oc.WatchCRD()
 
