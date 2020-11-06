@@ -33,7 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
@@ -106,6 +108,7 @@ type namespaceInfo struct {
 // Controller structure is the object which holds the controls for starting
 // and reacting upon the watched resources (e.g. pods, endpoints)
 type Controller struct {
+	client                clientset.Interface
 	kube                  kube.Interface
 	watchFactory          *factory.WatchFactory
 	egressFirewallHandler *factory.Handler
@@ -225,6 +228,7 @@ func NewOvnController(ovnClient *util.OVNClientset, wf *factory.WatchFactory,
 		addressSetFactory = NewOvnAddressSetFactory()
 	}
 	return &Controller{
+		client: ovnClient.KubeClient,
 		kube: &kube.Kube{
 			KClient:              ovnClient.KubeClient,
 			EIPClient:            ovnClient.EgressIPClient,
@@ -283,7 +287,7 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 
 	// Services are handled differently depending on the Kubernetes API versions
 	// We use a level triggered if k8s > 1.20, using endpoint slices instead endpoints
-	if util.DetectEndpointSlices(oc.kube) {
+	if util.DetectEndpointSlices(oc.client) {
 		klog.Infof("watching EndpointSlices instead of Endpoint in k8s versions > 1.19")
 		// Create our own informers to start compartamentalizing the code
 		// filter server side the things we don't care about
@@ -301,7 +305,8 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 		labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
 
 		// Make informers that filter out objects that want a non-default service proxy.
-		informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		const controllerResyncPeriod = 5 * time.Minute
+		informerFactory := informers.NewSharedInformerFactoryWithOptions(oc.client, controllerResyncPeriod,
 			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 				options.LabelSelector = labelSelector.String()
 			}))
@@ -312,11 +317,11 @@ func (oc *Controller) Run(wg *sync.WaitGroup) error {
 			const numWorkers = 2
 			defer wg.Done()
 			servicesv2.NewController(
-				oc.kube,
+				oc.client,
 				oc.ovnNBClient,
 				informerFactory.Core().V1().Services(),
 				informerFactory.Discovery().V1beta1().EndpointSlices(),
-			).Run(numWorkers, oc.StopChan)
+			).Run(numWorkers, oc.stopChan)
 		}()
 
 	} else {

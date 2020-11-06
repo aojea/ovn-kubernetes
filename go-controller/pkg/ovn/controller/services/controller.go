@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	goovn "github.com/ebay/go-ovn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -11,6 +12,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	discoverylisters "k8s.io/client-go/listers/discovery/v1beta1"
@@ -18,7 +20,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -37,6 +38,7 @@ const (
 
 // NewController returns a new *Controller.
 func NewController(client clientset.Interface,
+	ovnClient goovn.Client,
 	serviceInformer coreinformers.ServiceInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 ) *Controller {
@@ -81,6 +83,7 @@ func NewController(client clientset.Interface,
 // Controller manages selector-based service endpoints.
 type Controller struct {
 	client           clientset.Interface
+	ovnClient        goovn.Client
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
 
