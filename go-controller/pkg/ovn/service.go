@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/config"
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/ovn/loadbalancer"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"
 
 	kapi "k8s.io/api/core/v1"
@@ -87,7 +88,7 @@ func (ovn *Controller) syncServices(services []interface{}) {
 							continue
 						}
 						for _, physicalIP := range physicalIPs {
-							name := ovn.generateACLName(lb, physicalIP, svcPort.NodePort)
+							name := loadbalancer.GenerateACLName(lb, physicalIP, svcPort.NodePort)
 							if _, ok := svcRejectACLs[name]; !ok {
 								svcRejectACLs[name] = make(map[string]bool)
 							}
@@ -103,7 +104,7 @@ func (ovn *Controller) syncServices(services []interface{}) {
 			if err != nil {
 				klog.Warningf("Unable to get existing load balancer from ovn. Reject ACLs may not be synced!")
 			} else {
-				name := ovn.generateACLName(lb, service.Spec.ClusterIP, svcPort.Port)
+				name := loadbalancer.GenerateACLName(lb, service.Spec.ClusterIP, svcPort.Port)
 				if _, ok := svcRejectACLs[name]; !ok {
 					svcRejectACLs[name] = make(map[string]bool)
 				}
@@ -123,7 +124,7 @@ func (ovn *Controller) syncServices(services []interface{}) {
 							gateway, err)
 						continue
 					}
-					name := ovn.generateACLName(lb, extIP, svcPort.Port)
+					name := loadbalancer.GenerateACLName(lb, extIP, svcPort.Port)
 					if _, ok := svcRejectACLs[name]; !ok {
 						svcRejectACLs[name] = make(map[string]bool)
 					}
@@ -194,7 +195,7 @@ func (ovn *Controller) syncServices(services []interface{}) {
 			continue
 		}
 
-		loadBalancerVIPs, err := ovn.getLoadBalancerVIPs(loadBalancer)
+		loadBalancerVIPs, err := loadbalancer.GetLoadBalancerVIPs(loadBalancer)
 		if err != nil {
 			klog.Errorf("Failed to get load balancer vips for %s (%v)", loadBalancer, err)
 			continue
@@ -224,7 +225,7 @@ func (ovn *Controller) syncServices(services []interface{}) {
 				klog.Errorf("Gateway router %s does not have load balancer (%v)", gateway, err)
 				continue
 			}
-			loadBalancerVIPs, err := ovn.getLoadBalancerVIPs(loadBalancer)
+			loadBalancerVIPs, err := loadbalancer.GetLoadBalancerVIPs(loadBalancer)
 			if err != nil {
 				klog.Errorf("Failed to get load balancer vips for %s (%v)", loadBalancer, err)
 				continue
