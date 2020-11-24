@@ -89,6 +89,14 @@ func NewController(client clientset.Interface,
 
 	c.updatesBatchPeriod = updatesBatchPeriod
 
+	// repair controller
+	// TODO: parametrize correctly
+	c.repair = NewRepair(5*time.Minute,
+		serviceInformer.Lister(),
+		endpointSliceInformer.Lister(),
+		recorder,
+	)
+
 	return c
 }
 
@@ -125,6 +133,9 @@ type Controller struct {
 	workerLoopPeriod time.Duration
 
 	updatesBatchPeriod time.Duration
+
+	// repair contains a controller that keeps in sync OVN and Kubernetes services
+	repair *Repair
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -142,10 +153,20 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) error {
 		return fmt.Errorf("error syncing cache")
 	}
 
+	// Initialize OVN loadbalancer with current Kubernetes services in the cache
+	klog.Info("Initializing OVN services")
+	if err := c.repair.RunOnce(); err != nil {
+		klog.Errorf("Error during OVN service initialization: %v", err)
+	}
+
 	klog.Info("Starting workers")
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
 	}
+
+	// Start the repair controller to keep in sync Kubernetes and OVN
+	klog.Info("Starting services repair controller")
+	go c.repair.RunUntil(stopCh)
 
 	<-stopCh
 	return nil
