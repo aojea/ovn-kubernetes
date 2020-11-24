@@ -79,7 +79,7 @@ func TestRepair_NoUpdateEmpty(t *testing.T) {
 func TestRepair_OVNStaleData(t *testing.T) {
 	r := newFakeRepair()
 	// Expected OVN commands
-	fexec := ovntest.NewFakeExec()
+	fexec := ovntest.NewLooseCompareFakeExec()
 	initializeClusterIPLBs(fexec)
 	// There are remaining OVN LB that doesn't exist in Kubernetes
 	fexec.AddFakeCmd(&ovntest.ExpectedCmd{
@@ -121,7 +121,7 @@ func TestRepair_OVNStaleData(t *testing.T) {
 func TestRepair_OVNSynced(t *testing.T) {
 	r := newFakeRepair()
 	// Expected OVN commands
-	fexec := ovntest.NewFakeExec()
+	fexec := ovntest.NewLooseCompareFakeExec()
 	initializeClusterIPLBs(fexec)
 
 	svc, slices := createServiceWithEndpoints("svcfoo", "nsbar", []string{"10.96.0.10", "fd00:96::1"})
