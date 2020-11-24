@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/metrics"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/ovn/loadbalancer"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"
 
@@ -75,6 +76,12 @@ type serviceLoadBalancer map[string][]string
 
 // runOnce verifies the state of the cluster OVN LB VIP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) runOnce() error {
+	startTime := time.Now()
+	klog.V(4).Infof("Starting full-sync of services")
+	defer func() {
+		klog.V(4).Infof("Finished doing full-sync of services: %v", time.Since(startTime))
+		metrics.MetricSyncServiceLatency.WithLabelValues("full-sync").Observe(time.Since(startTime).Seconds())
+	}()
 	// We populate the struct first so we can compare and reconcile only the differences
 	k8sClusterIPLb := make(map[v1.Protocol]serviceLoadBalancer)
 	ovnClusterIPLb := make(map[v1.Protocol]serviceLoadBalancer)
