@@ -34,7 +34,7 @@ func TestGetACLByName(t *testing.T) {
 				Output: "",
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
