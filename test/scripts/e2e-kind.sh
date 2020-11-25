@@ -41,6 +41,9 @@ named port.+\[Feature:NetworkPolicy\]
 # TO BE FIXED BY https://github.com/kubernetes/kubernetes/pull/93119
 GCE
 
+# WIP
+Services should be rejected when no endpoints exist
+
 # ???
 \[Feature:NoSNAT\]
 Services.+(ESIPP|cleanup finalizer)
